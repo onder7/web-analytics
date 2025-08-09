@@ -1,6 +1,8 @@
 # Web Analytics Tracking System / Web İstatistikleri Takip Sistemi
 
 DEMO : https://networktoolkit.site/
+user: onder7@gmail.com
+pass.: asdasd123
 
 [English](#english) | [Türkçe](#turkish)
 
