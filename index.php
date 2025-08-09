@@ -76,9 +76,9 @@ error_log("Flight class found");
 try {
 Flight::set('flight.views.path', 'views');
 Flight::set('db.host', 'localhost');
-Flight::set('db.name', 'networktoolkit_networktoolkit');
-Flight::set('db.user', 'networktoolkit_networktoolkit');
-Flight::set('db.pass', '=~@iNd,gJX$H{,*1');
+Flight::set('db.name', 'DBNAME');
+Flight::set('db.user', 'USER');
+Flight::set('db.pass', 'YOUR_PASS');
     
     error_log("Flight configured successfully");
 } catch (Exception $e) {
