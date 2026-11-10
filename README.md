@@ -1,6 +1,6 @@
 # Web Analytics Tracking System / Web İstatistikleri Takip Sistemi
 
-Public demo: [https://networktoolkit.site/](https://web-analytics.ondernet.net/)
+Public demo: https://web-analytics.ondernet.net/
 
 [English](#english) | [Türkçe](#turkish)
 
