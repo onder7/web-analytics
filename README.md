@@ -4,11 +4,10 @@ Public demo: https://networktoolkit.site/
 
 [English](#english) | [Türkçe](#turkish)
 
-<img width="1912" height="924" alt="msedge_las3RNaZ4T" src="https://github.com/user-attachments/assets/ed7d6fb6-238e-4527-9397-5ed185ffd27c" />
 
-<img width="1912" height="924" alt="msedge_ol2wL3lSCb" src="https://github.com/user-attachments/assets/c0dfc115-fe5d-46c7-bc5d-259ae25baa95" />
 
-<img width="1912" height="924" alt="msedge_YW600xafUZ" src="https://github.com/user-attachments/assets/afbf800d-7e3a-4d23-ac53-95e34ff57211" />
+https://github.com/user-attachments/assets/78b6f5a9-2dfa-46e7-a40c-b2721dce556c
+
 
 
 
