@@ -426,6 +426,17 @@ return [
     'notif.from_name_label'     => 'Gönderen adı',
     'notif.from_name_placeholder' => 'WebStats',
     'notif.security_note'       => 'SMTP şifresi kaynak koduna veya sayfa çıktısına eklenmez.',
+    'notif.smtp_test_button'    => 'SMTP testi gönder',
+    'notif.smtp_test_testing'   => 'Test e-postası gönderiliyor...',
+    'notif.smtp_test_help'      => 'Test, formdaki SMTP ayarlarını kaydetmeden kullanır ve bildirim alıcısına e-posta gönderir. Şifre alanını boş bırakırsanız kayıtlı şifre kullanılır.',
+    'notif.smtp_test_success'   => 'Test e-postası SMTP sunucusu tarafından kabul edildi.',
+    'notif.smtp_test_failed'    => 'Test e-postası gönderilemedi:',
+    'notif.smtp_test_invalid_settings' => 'Alıcı, SMTP sunucusu, port, şifreleme ve gönderen alanlarını kontrol edin.',
+    'notif.smtp_test_csrf_failed' => 'Oturum doğrulaması başarısız oldu. Sayfayı yenileyip tekrar deneyin.',
+    'notif.smtp_test_session_expired' => 'Oturumunuz sona erdi. Yeniden giriş yapıp tekrar deneyin.',
+    'notif.smtp_test_save_before_clear' => 'Kayıtlı şifreyi silme seçeneği açık. SMTP testi için önce bu seçeneği kapatın veya ayarları kaydedin.',
+    'notif.smtp_test_subject'   => 'Web Analytics SMTP test e-postası',
+    'notif.smtp_test_body'      => 'Bu test e-postası, Web Analytics SMTP ayarlarınızın çalıştığını doğrular.',
     'notif.save_button'         => 'Ayarları Kaydet',
 
     // Websites page

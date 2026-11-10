@@ -583,6 +583,84 @@ class AnalyticsController {
         Flight::redirect('/analytics/notifications');
     }
 
+    public function testSmtp() {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+        if (!isset($_SESSION['user_id'])) {
+            $this->respondSmtpTest(401, ['message' => __('notif.smtp_test_session_expired')]);
+            return;
+        }
+
+        $submittedToken = $_POST['csrf_token'] ?? '';
+        $expectedToken = $_SESSION['notification_csrf'] ?? '';
+        if (!is_string($submittedToken) || !is_string($expectedToken) ||
+            strlen($expectedToken) !== 64 || !hash_equals($expectedToken, $submittedToken)) {
+            $this->respondSmtpTest(403, ['message' => __('notif.smtp_test_csrf_failed')]);
+            return;
+        }
+
+        if (isset($_POST['clear_smtp_password'])) {
+            $this->respondSmtpTest(422, ['message' => __('notif.smtp_test_save_before_clear')]);
+            return;
+        }
+
+        $postString = function($key) {
+            return isset($_POST[$key]) && is_string($_POST[$key]) ? trim($_POST[$key]) : '';
+        };
+        $port = filter_var($postString('smtp_port'), FILTER_VALIDATE_INT);
+        $settings = [
+            'recipient_email' => $postString('recipient_email'),
+            'smtp_host' => $postString('smtp_host'),
+            'smtp_port' => $port,
+            'smtp_encryption' => $postString('smtp_encryption'),
+            'smtp_username' => $postString('smtp_username'),
+            'from_email' => $postString('from_email'),
+            'from_name' => $postString('from_name')
+        ];
+        $smtpPassword = isset($_POST['smtp_password']) && is_string($_POST['smtp_password'])
+            ? $_POST['smtp_password']
+            : '';
+
+        if (!filter_var($settings['recipient_email'], FILTER_VALIDATE_EMAIL) ||
+            !filter_var($settings['from_email'], FILTER_VALIDATE_EMAIL) ||
+            $settings['smtp_host'] === '' ||
+            $port === false || $port < 1 || $port > 65535 ||
+            !in_array($settings['smtp_encryption'], ['tls', 'ssl', 'none'], true) ||
+            strlen($settings['smtp_host']) > 255 ||
+            strlen($settings['smtp_username']) > 191 ||
+            strlen($settings['from_name']) > 191 ||
+            strlen($smtpPassword) > 4096) {
+            $this->respondSmtpTest(422, ['message' => __('notif.smtp_test_invalid_settings')]);
+            return;
+        }
+
+        try {
+            if ($smtpPassword === '') {
+                $savedSettings = (new NotificationSettings())->getForSending((int) $_SESSION['user_id']);
+                $smtpPassword = $savedSettings['smtp_password'] ?? '';
+            }
+            $settings['smtp_password'] = $smtpPassword;
+            (new SmtpMailer())->send(
+                $settings,
+                __('notif.smtp_test_subject'),
+                __('notif.smtp_test_body')
+            );
+            $this->respondSmtpTest(200, ['message' => __('notif.smtp_test_success')]);
+        } catch (Throwable $error) {
+            AppLogger::error('smtp-test', $error->getMessage());
+            $detail = preg_replace('/[\r\n]+/', ' ', $error->getMessage());
+            $this->respondSmtpTest(502, [
+                'message' => __('notif.smtp_test_failed') . ' ' . substr((string) $detail, 0, 400)
+            ]);
+        }
+    }
+
+    private function respondSmtpTest($status, array $payload) {
+        http_response_code($status);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
     public function exportAnalyticsCsv() {
         $type = is_string($_GET['type'] ?? null) ? $_GET['type'] : '';
         $headers = [

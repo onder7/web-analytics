@@ -131,6 +131,50 @@
         window.setInterval(refreshCount, 30000);
     }
 
+    function setupSmtpTest() {
+        var form = document.querySelector('[data-notification-form]');
+        var button = form && form.querySelector('[data-smtp-test]');
+        var result = form && form.querySelector('[data-smtp-test-result]');
+        if (!form || !button || !result) return;
+
+        var label = button.textContent.trim();
+        var testingLabel = button.getAttribute('data-testing-label') || label;
+        button.addEventListener('click', function () {
+            if (!form.reportValidity() || button.disabled) return;
+
+            var data = new FormData(form);
+            button.disabled = true;
+            button.textContent = testingLabel;
+            result.textContent = '';
+            result.className = 'hidden text-sm';
+
+            fetch('/analytics/notifications/test-smtp', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+                body: data
+            }).then(function (response) {
+                return response.json().then(function (payload) {
+                    if (!response.ok) {
+                        throw new Error(payload.message || 'SMTP test failed.');
+                    }
+                    return payload;
+                });
+            }).then(function (payload) {
+                result.textContent = payload.message;
+                result.className = 'text-sm text-emerald-700';
+                result.setAttribute('role', 'status');
+            }).catch(function (error) {
+                result.textContent = error.message || 'SMTP test failed.';
+                result.className = 'text-sm text-rose-700';
+                result.setAttribute('role', 'alert');
+            }).then(function () {
+                button.disabled = false;
+                button.textContent = label;
+            });
+        });
+    }
+
     function drawTrendChart() {
         var chart = document.getElementById('trend-chart');
         var dataElement = document.getElementById('trend-data');
@@ -432,6 +476,7 @@
         setupWebsiteSelectors();
         setupDateRangeSelector();
         setupRealtimeActiveVisitors();
+        setupSmtpTest();
         drawTrendChart();
         setupTableControls();
     });

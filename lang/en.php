@@ -426,6 +426,17 @@ return [
     'notif.from_name_label'     => 'From name',
     'notif.from_name_placeholder' => 'WebStats',
     'notif.security_note'       => 'SMTP password is not included in source code or page output.',
+    'notif.smtp_test_button'    => 'Send SMTP test',
+    'notif.smtp_test_testing'   => 'Sending test email...',
+    'notif.smtp_test_help'      => 'The test uses the SMTP values in this form without saving them and emails the notification recipient. If the password field is blank, the saved password is used.',
+    'notif.smtp_test_success'   => 'The SMTP server accepted the test email.',
+    'notif.smtp_test_failed'    => 'The test email could not be sent:',
+    'notif.smtp_test_invalid_settings' => 'Check the recipient, SMTP server, port, encryption, and sender fields.',
+    'notif.smtp_test_csrf_failed' => 'Session verification failed. Refresh the page and try again.',
+    'notif.smtp_test_session_expired' => 'Your session has expired. Sign in again and retry.',
+    'notif.smtp_test_save_before_clear' => 'Delete saved SMTP password is selected. Turn it off or save the settings before testing.',
+    'notif.smtp_test_subject'   => 'Web Analytics SMTP test email',
+    'notif.smtp_test_body'      => 'This test email confirms that your Web Analytics SMTP settings are working.',
     'notif.save_button'         => 'Save Settings',
 
     // Websites page

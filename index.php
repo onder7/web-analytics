@@ -320,6 +320,7 @@ Flight::route('POST /analytics/security/2fa/confirm', [AnalyticsController::clas
 Flight::route('POST /analytics/security/2fa/disable', [AnalyticsController::class, 'disableTwoFactor']);
 Flight::route('POST /analytics/security/2fa/cancel', [AnalyticsController::class, 'cancelTwoFactorSetup']);
 Flight::route('POST /analytics/notifications', [AnalyticsController::class, 'saveNotifications']);
+Flight::route('POST /analytics/notifications/test-smtp', [AnalyticsController::class, 'testSmtp']);
 
 // Website Management Routes
 Flight::route('GET /websites', [WebsiteController::class, 'index']);

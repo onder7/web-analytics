@@ -28,7 +28,7 @@ $smtpPort = $notificationSettings['smtp_port'] ?: 587;
         <p><strong><?= panel_h(__('notif.info_title')) ?></strong> <?= panel_h(__('notif.info_message')) ?></p>
     </div>
 
-    <form method="post" action="/analytics/notifications" class="space-y-6">
+    <form method="post" action="/analytics/notifications" class="space-y-6" data-notification-form>
         <input type="hidden" name="csrf_token" value="<?= panel_h($notificationCsrf) ?>">
 
         <section class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
@@ -106,11 +106,20 @@ $smtpPort = $notificationSettings['smtp_port'] ?: 587;
                 </label>
             </div>
             <div class="flex flex-col justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:flex-row sm:items-center lg:px-6">
-                <p class="text-xs text-slate-500"><i data-lucide="lock-keyhole" class="mr-1 inline h-3.5 w-3.5"></i><?= panel_h(__('notif.security_note')) ?></p>
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100">
-                    <i data-lucide="save" class="h-4 w-4"></i><?= panel_h(__('notif.save_button')) ?>
-                </button>
+                <div class="space-y-1">
+                    <p class="text-xs text-slate-500"><i data-lucide="lock-keyhole" class="mr-1 inline h-3.5 w-3.5"></i><?= panel_h(__('notif.security_note')) ?></p>
+                    <p data-smtp-test-result class="hidden text-sm" role="status" aria-live="polite"></p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <button type="button" data-smtp-test data-testing-label="<?= panel_h(__('notif.smtp_test_testing')) ?>" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="mail" class="h-4 w-4"></i><?= panel_h(__('notif.smtp_test_button')) ?>
+                    </button>
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="save" class="h-4 w-4"></i><?= panel_h(__('notif.save_button')) ?>
+                    </button>
+                </div>
             </div>
         </section>
+        <p class="-mt-4 text-xs text-slate-500"><?= panel_h(__('notif.smtp_test_help')) ?></p>
     </form>
 </div>
