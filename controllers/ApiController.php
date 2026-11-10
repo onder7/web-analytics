@@ -2,337 +2,218 @@
 class ApiController {
     private $analyticsModel;
     private $websiteModel;
-    
+    private $geoIpLookup;
+
     public function __construct() {
         $this->analyticsModel = new Analytics();
         $this->websiteModel = new Website();
+        $this->geoIpLookup = new GeoIpLookup();
     }
-    
+
     public function track($action) {
-        // CORS headers - TÜM origin'lere izin ver
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
-        header('Access-Control-Max-Age: 86400'); // 24 saat cache
-        header('Content-Type: application/json');
-        
-        // OPTIONS preflight request'i için
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
-        
-        // POST, GET ve diğer methodları kabul et
-        if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'GET'])) {
-            http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed. Use POST or GET.']);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Vary: Origin');
+
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $this->respond(405, ['error' => 'Only POST requests are supported.']);
             return;
         }
-        
-        // API key kontrolü - GET ve POST'tan al
-        $apiKey = $_GET['api_key'] ?? $_POST['api_key'] ?? '';
-        
-        // JSON body'den de API key al
+
+        if (!in_array($action, ['pageview', 'event'], true)) {
+            $this->respond(400, ['error' => 'Invalid tracking action.']);
+            return;
+        }
+
         $rawInput = file_get_contents('php://input');
-        if ($rawInput) {
-            $jsonData = json_decode($rawInput, true);
-            if ($jsonData && isset($jsonData['api_key'])) {
-                $apiKey = $jsonData['api_key'];
-            }
-        }
-        
-        if (empty($apiKey)) {
-            http_response_code(401);
-            echo json_encode(['error' => 'API key required']);
-            return;
-        }
-        
-        $website = $this->websiteModel->findByApiKey($apiKey);
-        if (!$website) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid API key']);
-            return;
-        }
-        
-        // Data'yı farklı kaynaklardan al
         $data = [];
-        
-        // JSON body'den
-        if ($rawInput) {
-            $jsonData = json_decode($rawInput, true);
-            if ($jsonData) {
-                $data = $jsonData;
+        if (is_string($rawInput) && $rawInput !== '') {
+            $decoded = json_decode($rawInput, true);
+            if (!is_array($decoded)) {
+                $this->respond(400, ['error' => 'Invalid JSON payload.']);
+                return;
             }
-        }
-        
-        // POST data'dan
-        if (empty($data) && !empty($_POST)) {
+            $data = $decoded;
+        } elseif (!empty($_POST)) {
             $data = $_POST;
         }
-        
-        // GET data'dan (fallback)
-        if (empty($data) && !empty($_GET)) {
-            $data = $_GET;
+
+        $apiKey = $data['api_key'] ?? '';
+        if (!is_string($apiKey) || strlen($apiKey) !== 64 || !ctype_xdigit($apiKey)) {
+            $this->respond(401, ['error' => 'A valid API key is required.']);
+            return;
         }
-        
-        // IP ve coğrafi bilgileri ekle
-        $this->enrichWithGeoData($data);
-        
+
+        $website = $this->websiteModel->findByApiKey($apiKey);
+        if (!$website) {
+            $this->respond(401, ['error' => 'Invalid API key.']);
+            return;
+        }
+
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if (!is_string($origin) || !$this->originMatchesWebsite($origin, $website['domain'])) {
+            $this->respond(403, ['error' => 'This origin is not allowed for the website.']);
+            return;
+        }
+
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: POST');
+        header('Access-Control-Allow-Headers: Content-Type');
+
+        if ($this->isBotUserAgent($_SERVER['HTTP_USER_AGENT'] ?? '')) {
+            $this->respond(200, ['success' => true, 'ignored' => true]);
+            return;
+        }
+
         try {
-            switch ($action) {
-                case 'pageview':
-                    $result = $this->trackPageView($website['id'], $data);
-                    break;
-                case 'event':
-                    $result = $this->trackEvent($website['id'], $data);
-                    break;
-                default:
-                    http_response_code(400);
-                    echo json_encode(['error' => 'Invalid action. Use pageview or event.']);
-                    return;
-            }
-            
-            if ($result) {
-                echo json_encode(['success' => true, 'message' => 'Data tracked successfully']);
+            $this->enrichWithGeoData($data);
+            if ($action === 'pageview') {
+                $result = $this->trackPageView($website['id'], $data);
             } else {
-                http_response_code(500);
-                echo json_encode(['error' => 'Failed to track data']);
+                $result = $this->trackEvent($website['id'], $data);
             }
-            
-        } catch (Exception $e) {
-            error_log("API Error: " . $e->getMessage());
-            http_response_code(500);
-            echo json_encode(['error' => 'Internal server error: ' . $e->getMessage()]);
+
+            if (!$result) {
+                $this->respond(500, ['error' => 'Failed to track data.']);
+                return;
+            }
+            $this->respond(200, ['success' => true]);
+        } catch (Throwable $error) {
+            AppLogger::error('tracking-api', $error->getMessage());
+            try {
+                (new NotificationService())->queueTrackingError((int) $website['id']);
+            } catch (Throwable $notificationError) {
+                AppLogger::error('tracking-notification', $notificationError->getMessage());
+            }
+            $this->respond(500, ['error' => 'An internal error occurred while tracking data.']);
         }
     }
-    
-    /**
-     * IP ve coğrafi bilgileri ekle
-     */
+
+    private function respond($status, array $payload) {
+        Flight::response()->status($status);
+        echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private function originMatchesWebsite($origin, $domain) {
+        if (!is_string($origin) || $origin === 'null') {
+            return false;
+        }
+
+        $originParts = parse_url($origin);
+        $domainUrl = preg_match('~^https?://~i', (string) $domain)
+            ? (string) $domain
+            : 'https://' . (string) $domain;
+        $domainParts = parse_url($domainUrl);
+        if (!is_array($originParts) || !is_array($domainParts) ||
+            !in_array(strtolower($originParts['scheme'] ?? ''), ['http', 'https'], true) ||
+            empty($originParts['host']) || empty($domainParts['host']) ||
+            isset($originParts['user']) || isset($originParts['pass'])) {
+            return false;
+        }
+
+        $originHost = strtolower(rtrim($originParts['host'], '.'));
+        $domainHost = strtolower(rtrim($domainParts['host'], '.'));
+        $hostsMatch = $originHost === $domainHost;
+        if (!$hostsMatch) {
+            $hostsMatch = preg_replace('/^www\\./', '', $originHost) === preg_replace('/^www\\./', '', $domainHost);
+        }
+        if (!$hostsMatch) {
+            return false;
+        }
+
+        return !isset($domainParts['port']) || (int) ($originParts['port'] ?? 0) === (int) $domainParts['port'];
+    }
+
+    private function isBotUserAgent($userAgent) {
+        if (!is_string($userAgent) || $userAgent === '') {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/(?:bot|crawler|spider|slurp|headless|phantomjs|selenium|playwright|puppeteer|lighthouse)/i',
+            $userAgent
+        );
+    }
+
     private function enrichWithGeoData(&$data) {
-        // Gerçek IP adresini al
         $ip = $this->getRealIpAddress();
         $data['ip_address'] = $ip;
-        
-        // Coğrafi bilgileri al
-        $geoData = $this->getGeoDataFromIp($ip);
-        
-        // Data'ya coğrafi bilgileri ekle
-        $data['country'] = $geoData['country'] ?? null;
-        $data['country_code'] = $geoData['country_code'] ?? null;
-        $data['region'] = $geoData['region'] ?? null;
-        $data['city'] = $geoData['city'] ?? null;
-        $data['latitude'] = $geoData['latitude'] ?? null;
-        $data['longitude'] = $geoData['longitude'] ?? null;
-        $data['timezone'] = $geoData['timezone'] ?? null;
-        $data['isp'] = $geoData['isp'] ?? null;
+        foreach ($this->geoIpLookup->cachedOrQueue($ip) as $key => $value) {
+            $data[$key] = $value;
+        }
     }
-    
-    /**
-     * Gerçek IP adresini al (proxy ve CDN desteği ile)
-     */
+
     private function getRealIpAddress() {
-        // Proxy ve CDN header'larını kontrol et
-        $headers = [
-            'HTTP_CF_CONNECTING_IP',     // Cloudflare
-            'HTTP_X_REAL_IP',            // Nginx
-            'HTTP_X_FORWARDED_FOR',      // Load Balancer/Proxy
-            'HTTP_X_FORWARDED',          // Proxy
-            'HTTP_X_CLUSTER_CLIENT_IP',  // Cluster
-            'HTTP_FORWARDED_FOR',        // Proxy
-            'HTTP_FORWARDED',            // Proxy
-            'REMOTE_ADDR'                // Standard
-        ];
-        
-        foreach ($headers as $header) {
-            if (isset($_SERVER[$header]) && !empty($_SERVER[$header])) {
-                $ips = explode(',', $_SERVER[$header]);
-                $ip = trim($ips[0]);
-                
-                // Geçerli IP kontrolü
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                    return $ip;
+        $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (!filter_var($remoteIp, FILTER_VALIDATE_IP)) {
+            return '127.0.0.1';
+        }
+
+        $trustedProxies = array_filter(array_map('trim', explode(',', getenv('TRUSTED_PROXIES') ?: '')));
+        if (in_array($remoteIp, $trustedProxies, true)) {
+            foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR'] as $header) {
+                if (empty($_SERVER[$header])) {
+                    continue;
+                }
+                foreach (explode(',', $_SERVER[$header]) as $candidate) {
+                    $candidate = trim($candidate);
+                    if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                        return $candidate;
+                    }
                 }
             }
         }
-        
-        // Fallback
-        return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+        return $remoteIp;
     }
-    
-    /**
-     * IP'den coğrafi bilgi al
-     * Birden fazla servis ile fallback sistemi
-     */
-    private function getGeoDataFromIp($ip) {
-        // Local/test IP kontrolü
-        if ($ip === '127.0.0.1' || $ip === '::1' || strpos($ip, '192.168.') === 0 || strpos($ip, '10.') === 0) {
-            return [
-                'country' => 'Local',
-                'country_code' => 'LO',
-                'region' => 'Local',
-                'city' => 'Localhost',
-                'latitude' => null,
-                'longitude' => null,
-                'timezone' => date_default_timezone_get(),
-                'isp' => 'Local'
-            ];
-        }
-        
-        // Cache kontrolü (opsiyonel - Redis/Memcache kullanabilirsiniz)
-        $cacheKey = 'geo_' . md5($ip);
-        
-        // Servisler (sırayla denenecek)
-        $services = [
-            'ipapi' => "http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,timezone,isp",
-            'ipinfo' => "https://ipinfo.io/{$ip}/json",
-            'freegeoip' => "https://freegeoip.app/json/{$ip}"
-        ];
-        
-        foreach ($services as $serviceName => $url) {
-            try {
-                $geoData = $this->fetchGeoData($url, $serviceName);
-                if ($geoData) {
-                    // Cache'e kaydet (24 saat)
-                    // $this->cacheSet($cacheKey, $geoData, 86400);
-                    return $geoData;
-                }
-            } catch (Exception $e) {
-                error_log("Geo service {$serviceName} failed: " . $e->getMessage());
-                continue;
-            }
-        }
-        
-        // Tüm servisler başarısız olursa varsayılan değerler
-        return [
-            'country' => 'Unknown',
-            'country_code' => 'XX',
-            'region' => 'Unknown',
-            'city' => 'Unknown',
-            'latitude' => null,
-            'longitude' => null,
-            'timezone' => date_default_timezone_get(),
-            'isp' => 'Unknown'
-        ];
-    }
-    
-    /**
-     * Coğrafi veri çek
-     */
-    private function fetchGeoData($url, $serviceName) {
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 3, // 3 saniye timeout
-                'user_agent' => 'NetworkAnalytics/1.0'
-            ]
-        ]);
-        
-        $response = @file_get_contents($url, false, $context);
-        
-        if ($response === false) {
-            throw new Exception("Failed to fetch data from {$serviceName}");
-        }
-        
-        $data = json_decode($response, true);
-        
-        if (!$data) {
-            throw new Exception("Invalid JSON response from {$serviceName}");
-        }
-        
-        // Servis-specific parsing
-        switch ($serviceName) {
-            case 'ipapi':
-                if (isset($data['status']) && $data['status'] === 'fail') {
-                    throw new Exception("IP-API error: " . ($data['message'] ?? 'Unknown error'));
-                }
-                return [
-                    'country' => $data['country'] ?? null,
-                    'country_code' => $data['countryCode'] ?? null,
-                    'region' => $data['regionName'] ?? null,
-                    'city' => $data['city'] ?? null,
-                    'latitude' => $data['lat'] ?? null,
-                    'longitude' => $data['lon'] ?? null,
-                    'timezone' => $data['timezone'] ?? null,
-                    'isp' => $data['isp'] ?? null
-                ];
-                
-            case 'ipinfo':
-                $location = explode(',', $data['loc'] ?? '');
-                return [
-                    'country' => $data['country'] ?? null,
-                    'country_code' => $data['country'] ?? null,
-                    'region' => $data['region'] ?? null,
-                    'city' => $data['city'] ?? null,
-                    'latitude' => isset($location[0]) ? floatval($location[0]) : null,
-                    'longitude' => isset($location[1]) ? floatval($location[1]) : null,
-                    'timezone' => $data['timezone'] ?? null,
-                    'isp' => $data['org'] ?? null
-                ];
-                
-            case 'freegeoip':
-                return [
-                    'country' => $data['country_name'] ?? null,
-                    'country_code' => $data['country_code'] ?? null,
-                    'region' => $data['region_name'] ?? null,
-                    'city' => $data['city'] ?? null,
-                    'latitude' => $data['latitude'] ?? null,
-                    'longitude' => $data['longitude'] ?? null,
-                    'timezone' => $data['time_zone'] ?? null,
-                    'isp' => null
-                ];
-        }
-        
-        return null;
-    }
-    
+
     private function trackPageView($websiteId, $data) {
         $visitorId = $data['visitor_id'] ?? '';
-        if (empty($visitorId)) {
-            throw new Exception('Visitor ID required');
+        if (!is_string($visitorId) || $visitorId === '' || strlen($visitorId) > 64) {
+            throw new InvalidArgumentException('A valid visitor ID is required.');
         }
-        
-        try {
-            $visitorDbId = $this->analyticsModel->getOrCreateVisitor($visitorId);
-            return $this->analyticsModel->recordPageView($websiteId, $visitorDbId, $data);
-        } catch (Exception $e) {
-            error_log("TrackPageView Error: " . $e->getMessage());
-            throw $e;
-        }
+
+        $visitorDbId = $this->analyticsModel->getOrCreateVisitor($visitorId);
+        return $this->analyticsModel->recordPageView($websiteId, $visitorDbId, $data);
     }
-    
+
     private function trackEvent($websiteId, $data) {
-        try {
-            $db = Database::getConnection();
-            
-            $visitorId = $data['visitor_id'] ?? '';
-            if (empty($visitorId)) {
-                throw new Exception('Visitor ID required');
-            }
-            
-            $visitorDbId = $this->analyticsModel->getOrCreateVisitor($visitorId);
-            
-            $sql = "INSERT INTO events (
-                        website_id, visitor_id, session_id, event_type, 
-                        event_category, event_action, event_label, event_value,
-                        page_url, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-            
-            $stmt = $db->prepare($sql);
-            return $stmt->execute([
+        $visitorId = $data['visitor_id'] ?? '';
+        $sessionId = $data['session_id'] ?? '';
+        if (!is_string($visitorId) || $visitorId === '' || strlen($visitorId) > 64 ||
+            !is_string($sessionId) || $sessionId === '' || strlen($sessionId) > 64) {
+            throw new InvalidArgumentException('Valid visitor and session IDs are required.');
+        }
+
+        $visitorDbId = $this->analyticsModel->getOrCreateVisitor($visitorId);
+        $db = Database::getConnection();
+        $statement = $db->prepare(
+            'INSERT INTO events (
+                website_id, visitor_id, session_id, event_type, event_category,
+                event_action, event_label, event_value, page_url, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+        );
+        $result = $statement->execute([
+            $websiteId,
+            $visitorDbId,
+            $sessionId,
+            substr((string) ($data['event_type'] ?? 'custom'), 0, 50),
+            isset($data['event_category']) ? substr((string) $data['event_category'], 0, 100) : null,
+            isset($data['event_action']) ? substr((string) $data['event_action'], 0, 100) : null,
+            isset($data['event_label']) ? substr((string) $data['event_label'], 0, 255) : null,
+            isset($data['event_value']) && is_numeric($data['event_value']) ? $data['event_value'] : null,
+            substr((string) ($data['page_url'] ?? ''), 0, 65535)
+        ]);
+
+        if ($result && ($data['event_category'] ?? '') === 'time-on-page' &&
+            isset($data['event_value']) && is_numeric($data['event_value'])) {
+            $this->analyticsModel->updateSessionDuration(
                 $websiteId,
                 $visitorDbId,
-                $data['session_id'] ?? '',
-                $data['event_type'] ?? 'custom',
-                $data['event_category'] ?? null,
-                $data['event_action'] ?? null,
-                $data['event_label'] ?? null,
-                $data['event_value'] ?? null,
-                $data['page_url'] ?? ''
-            ]);
-            
-        } catch (Exception $e) {
-            error_log("TrackEvent Error: " . $e->getMessage());
-            throw $e;
+                $sessionId,
+                $data['event_value']
+            );
         }
+
+        return $result;
     }
 }

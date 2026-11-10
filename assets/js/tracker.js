@@ -24,8 +24,6 @@
         return;
     }
     
-    console.log('Network Analytics: Using API URL:', apiUrl);
-    
     // Generate visitor ID
     let visitorId = localStorage.getItem('na_visitor_id');
     if (!visitorId) {
@@ -77,15 +75,11 @@
         
         const url = `${apiUrl}/track/${endpoint}`;
         
-        // Debug log - API key kontrolü
-        console.log('API Key:', apiKey);
-        console.log('Sending to:', url, data);
-        
         // Fetch ile gönder
         fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'text/plain;charset=UTF-8',
                 'Accept': 'application/json'
             },
             body: JSON.stringify(data),
@@ -101,60 +95,34 @@
         .then(function(result) {
             if (result.error) {
                 console.error('API Error:', result.error);
-                // Fallback tracking dene
-                fallbackTracking(endpoint, data);
-            } else {
-                console.log('Analytics success:', result);
             }
         })
         .catch(function(error) {
             console.error('Network Analytics Error:', error);
-            
-            // Fallback: Image pixel tracking
-            fallbackTracking(endpoint, data);
         });
     }
     
-    // Fallback tracking method - Image pixel
-    function fallbackTracking(endpoint, data) {
-        try {
-            const img = new Image();
-            const params = new URLSearchParams();
-            
-            // Data'yı URL params'a çevir
-            Object.keys(data).forEach(key => {
-                if (data[key] !== null && data[key] !== undefined) {
-                    params.append(key, data[key]);
-                }
-            });
-            
-            img.src = `${apiUrl}/track/${endpoint}?${params.toString()}`;
-            img.style.display = 'none';
-            document.body.appendChild(img);
-            
-            // Image'ı temizle
-            setTimeout(() => {
-                if (img.parentNode) {
-                    img.parentNode.removeChild(img);
-                }
-            }, 1000);
-            
-            console.log('Fallback tracking used');
-        } catch (e) {
-            console.error('Fallback tracking failed:', e);
-        }
-    }
-    
+    let lastTrackedUrl = null;
+    let pageReferrer = document.referrer || '';
+
     // Track page view
     function trackPageView() {
+        const pageUrl = window.location.href;
+        if (lastTrackedUrl !== null && lastTrackedUrl !== pageUrl) {
+            pageReferrer = lastTrackedUrl;
+            window.dispatchEvent(new CustomEvent('networkanalytics:navigation', {
+                detail: { previousUrl: lastTrackedUrl }
+            }));
+        }
+        lastTrackedUrl = pageUrl;
         const browserInfo = getBrowserInfo();
-        
+
         const data = {
             visitor_id: visitorId,
             session_id: sessionId,
-            page_url: window.location.href,
+            page_url: pageUrl,
             page_title: document.title,
-            referrer_url: document.referrer,
+            referrer_url: pageReferrer,
             user_agent: navigator.userAgent,
             browser: browserInfo.browser,
             os: browserInfo.os,
@@ -166,9 +134,34 @@
         
         sendData('pageview', data);
     }
-    
+
+    function trackSpaNavigation() {
+        let scheduled = false;
+        function checkNavigation() {
+            if (scheduled) return;
+            scheduled = true;
+            setTimeout(function() {
+                scheduled = false;
+                if (window.location.href !== lastTrackedUrl) {
+                    trackPageView();
+                }
+            }, 0);
+        }
+
+        ['pushState', 'replaceState'].forEach(function(method) {
+            const original = window.history[method];
+            window.history[method] = function() {
+                const result = original.apply(this, arguments);
+                checkNavigation();
+                return result;
+            };
+        });
+        window.addEventListener('popstate', checkNavigation);
+        window.addEventListener('hashchange', checkNavigation);
+    }
+
     // Track custom event
-    function trackEvent(eventType, category, action, label, value) {
+    function trackEvent(eventType, category, action, label, value, pageUrl) {
         const data = {
             visitor_id: visitorId,
             session_id: sessionId,
@@ -177,7 +170,7 @@
             event_action: action,
             event_label: label,
             event_value: value,
-            page_url: window.location.href
+            page_url: pageUrl || window.location.href
         };
         
         sendData('event', data);
@@ -217,7 +210,12 @@
         let maxScroll = 0;
         const milestones = [25, 50, 75, 100];
         const reached = [];
-        
+
+        window.addEventListener('networkanalytics:navigation', function() {
+            maxScroll = 0;
+            reached.length = 0;
+        });
+
         function checkScroll() {
             const scrollTop = window.pageYOffset;
             const docHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -260,6 +258,14 @@
             if (timeSpent > 0 && isActive) {
                 trackEvent('timing', 'time-on-page', 'duration', window.location.pathname, timeSpent);
             }
+
+            window.addEventListener('networkanalytics:navigation', function(event) {
+                const timeSpent = Math.round((Date.now() - startTime) / 1000);
+                if (timeSpent > 0 && isActive) {
+                    trackEvent('timing', 'time-on-page', 'duration', event.detail.previousUrl, timeSpent, event.detail.previousUrl);
+                }
+                startTime = Date.now();
+            });
         }
         
         // Visibility API - sayfa görünür mü kontrol et
@@ -291,6 +297,7 @@
     function init() {
         // Track page view immediately
         trackPageView();
+        trackSpaNavigation();
         
         // Track performance metrics
         trackPerformance();
@@ -309,7 +316,6 @@
             sessionId: sessionId
         };
         
-        console.log('Network Analytics initialized with visitor:', visitorId);
     }
     
     // Initialize when DOM is ready

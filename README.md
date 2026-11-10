@@ -1,8 +1,6 @@
 # Web Analytics Tracking System / Web İstatistikleri Takip Sistemi
 
-DEMO : https://networktoolkit.site/
-user: onder7@gmail.com
-pass.: asdasd123
+Public demo: https://networktoolkit.site/
 
 [English](#english) | [Türkçe](#turkish)
 
@@ -34,6 +32,10 @@ A lightweight, self-hosted web analytics system built with FlightPHP framework. 
 
 ### 🚀 Quick Start
 
+On a new installation, open the application URL and follow the setup wizard to connect an **empty** MySQL/MariaDB database and create the first administrator. The wizard reads the table definitions from the root `db.sql` file and refuses to modify a database that already contains tables. `db.sql` contains schema only; it has no prefilled users, websites, or analytics records. Do not import it manually before running the wizard, or the database will no longer be empty. The wizard saves connection settings to a project-specific hidden PHP file in the parent directory of the web root (for this project, `.web-analytics.local-database.php`); keep that file private and back it up.
+
+If setup stops partway through with a SQL error, MySQL does not automatically roll back table-creation statements. The wizard will not delete partially created tables; create a new empty database and run setup again against it. Do not manually drop tables until you have confirmed the database is dedicated to this failed setup and contains no data you need.
+
 #### Requirements
 
 - PHP 7.4 or higher
@@ -54,27 +56,14 @@ cd web-analytics
 composer install
 ```
 
-3. Create database and import schema:
+3. Create an empty database (the database user must have permission to create tables):
 ```bash
 mysql -u root -p -e "CREATE DATABASE web_analytics"
-mysql -u root -p web_analytics < database/schema.sql
 ```
 
-4. Configure database connection in `public/index.php`:
-```php
-Flight::set('db.host', 'localhost');
-Flight::set('db.name', 'web_analytics');
-Flight::set('db.user', 'your_username');
-Flight::set('db.pass', 'your_password');
-```
+4. Point the virtual host to the project root and open its URL. Enter the database and first administrator details in the setup wizard. The wizard reads only table definitions from `db.sql` and creates the administrator; do not import the file manually before setup.
 
-5. Set up virtual host pointing to `/public` directory
-
-6. Generate API key for your website:
-```sql
-INSERT INTO websites (domain, name, api_key) 
-VALUES ('example.com', 'My Website', SHA2(CONCAT(NOW(), RAND()), 256));
-```
+5. Sign in with the administrator account and add your first website from the Websites page.
 
 ### 📝 Usage
 
@@ -113,7 +102,7 @@ If using Nginx, see the included `nginx.conf` example.
 
 ### 📊 Dashboard
 
-Access the analytics dashboard at `https://your-analytics-domain.com/dashboard.html`
+After signing in, access the analytics dashboard at `/dashboard` or `/analytics`. The dashboard includes overview, statistics, traffic analysis, visitors, pages, sources, and settings views backed by the existing MySQL analytics tables.
 
 ### 🔒 Security
 
@@ -121,6 +110,7 @@ Access the analytics dashboard at `https://your-analytics-domain.com/dashboard.h
 - Rate limiting to prevent abuse
 - CORS headers for cross-origin requests
 - SQL injection protection with prepared statements
+- Optional authenticator-app TOTP two-factor authentication with one-time recovery codes
 
 ### 📄 License
 
@@ -147,6 +137,10 @@ FlightPHP framework ile geliştirilmiş, hafif ve kendi sunucunuzda barındırab
 
 ### 🚀 Hızlı Başlangıç
 
+Yeni bir kurulumda uygulama adresini açıp sihirbazı izleyin: **boş** MySQL/MariaDB veritabanı bağlantısını girin ve ilk yönetici hesabını oluşturun. Sihirbaz kök dizindeki `db.sql` dosyasından yalnızca tablo şemalarını okur; dosyada önceden eklenmiş kullanıcı, site veya analiz verisi yoktur. Sihirbaz tablo içeren veritabanlarına dokunmaz; bu nedenle `db.sql` dosyasını sihirbazdan önce elle içe aktarmayın. Bağlantı bilgileri web kök dizininin bir üst klasöründeki projeye özel gizli bir PHP dosyasına kaydedilir (`web-analytics.local` projesinde `.web-analytics.local-database.php`); bu dosyayı gizli tutup yedekleyin. Sihirbazı kullanmak için PHP PDO MySQL eklentisi ve proje üst klasörüne yazma izni gereklidir.
+
+Kurulum SQL hatasıyla yarıda kalırsa MySQL tablo işlemlerini otomatik geri almaz. Sihirbazın güvenlik kontrolü kısmen oluşmuş tabloları silmez; kuruluma devam etmek için yeni ve boş bir veritabanı oluşturup sihirbazı o veritabanıyla yeniden çalıştırın. Mevcut tabloları elle silmeden önce veritabanının yalnızca bu yarım kurulum için ayrıldığını doğrulayın.
+
 #### Gereksinimler
 
 - PHP 7.4 veya üzeri
@@ -167,27 +161,14 @@ cd web-analytics
 composer install
 ```
 
-3. Veritabanı oluşturun ve şemayı içe aktarın:
+3. Boş bir veritabanı oluşturun (veritabanı kullanıcısının tablo oluşturma izni olmalıdır):
 ```bash
 mysql -u root -p -e "CREATE DATABASE web_analytics"
-mysql -u root -p web_analytics < database/schema.sql
 ```
 
-4. `public/index.php` dosyasında veritabanı bağlantısını yapılandırın:
-```php
-Flight::set('db.host', 'localhost');
-Flight::set('db.name', 'web_analytics');
-Flight::set('db.user', 'kullanici_adi');
-Flight::set('db.pass', 'sifre');
-```
+4. Virtual host'u proje kök dizinine yönlendirin ve uygulama adresini açın. Kurulum sihirbazında veritabanı ve ilk yönetici bilgilerini girin. Sihirbaz `db.sql` dosyasından yalnızca tablo şemalarını kurar ve ilk yönetici hesabını oluşturur; dosyayı sihirbazdan önce elle içe aktarmayın.
 
-5. Virtual host'u `/public` dizinine yönlendirin
-
-6. Web siteniz için API anahtarı oluşturun:
-```sql
-INSERT INTO websites (domain, name, api_key) 
-VALUES ('example.com', 'Benim Sitem', SHA2(CONCAT(NOW(), RAND()), 256));
-```
+5. Yönetici hesabıyla giriş yapın ve Web Siteleri sayfasından ilk sitenizi ekleyin.
 
 ### 📝 Kullanım
 
@@ -226,13 +207,105 @@ Nginx kullanıyorsanız, dahil edilen `nginx.conf` örneğine bakın.
 
 ### 📊 Kontrol Paneli
 
-Analitik kontrol paneline `https://analytics-domain.com/dashboard.html` adresinden erişin
+Giriş yaptıktan sonra yenilenen analitik paneline `/dashboard` veya `/analytics` adresinden erişin. Panelde şu bölümler bulunur:
+
+- `/analytics/overview` — Genel Bakış
+- `/analytics/statistics` — İstatistikler
+- `/analytics/traffic` — Trafik Analizi
+- `/analytics/visitors` — Ziyaretçiler
+- `/analytics/pages` — Sayfalar
+- `/analytics/sources` — Kaynaklar
+- `/analytics/settings` — Ayarlar ve izleme kodu
+- `/analytics/notifications` — E-posta bildirim tercihleri ve SMTP ayarları
+- `/analytics/system` — giriş yapmış kullanıcılar için veritabanı durumu ve günlükler; tablo optimizasyonu yalnızca sistem yöneticilerine açık
+
+Panel verileri seçili site için MySQL'deki `page_views`, `visitors`, `sessions` ve `events` tablolarından okunur. Bildirim tercihleri ve SMTP sunucu bilgileri kullanıcı bazında `notification_settings` tablosunda saklanır. SMTP şifresi AES-256-GCM ile şifrelenir; anahtar web kök dizininin dışındaki üst dizinde `.web-analytics-smtp.key` adıyla oluşturulur. Uygulamanın bu dosyayı oluşturabilmesi için üst dizinin yazılabilir olması gerekir; sunucu taşınırken anahtar da güvenli biçimde taşınmalıdır. Günlük/haftalık/aylık raporlar, saatlik trafik anomalileri ve izleme hatası bildirimleri için aşağıdaki CLI zamanlayıcısını kurun. Tailwind CSS ve Font Awesome CDN kullanıldığı için panel tasarımının yüklenmesi sırasında internet erişimi gerekir.
+
+Ayarlar sayfasındaki Profil sekmesinden kullanıcı adı ve e-posta güncellenebilir. Güvenlik sekmesinde şifre değişimi, mevcut şifrenin doğrulanmasını, en az 8 karakter ve onay alanını gerektirir. Her iki işlem de oturum CSRF belirteciyle korunur.
+
+Analitik sayfalarının üst çubuğundan son 7, 30 veya 90 günü ya da başlangıç/bitiş tarihlerini belirleyerek özel bir aralığı seçebilirsiniz. Özetler, grafikler, ziyaretçi ve kaynak raporları seçilen aralığa göre yenilenir; canlı kartlar, son 24 saatlik saat grafiği ve haftalık aktivite haritası gerçek zamanlı kapsamlarını korur.
+
+Her site için saat dilimi `/websites/{id}/edit` sayfasından seçilir. Tarih sınırları ve günlük/saatlik grafik grupları bu yerel saat dilimini kullanır; geçmiş verilerin zaman damgaları değiştirilmez. Adlandırılmış saat dilimlerinin MySQL'de çalışması için MySQL timezone tablolarının yüklü olması gerekir. Linux'ta genellikle `mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p mysql` komutuyla yüklenebilir; Windows'ta MySQL dağıtımınıza uygun timezone tablolarını `mysql` sistem veritabanına yükleyin.
+
+İstatistikler sayfasındaki anlık aktif ziyaretçi sayısı `/analytics/realtime?website_id=SITE_ID` uç noktasından 30 saniyede bir yenilenir. Uç nokta yalnızca kullanıcının sahibi olduğu veya ekip erişimi bulunan siteler için sayı döndürür.
+
+Genel Bakış kartları seçili aralığı, hemen önceki eş uzunluktaki dönemle yüzde olarak karşılaştırır. Sayfalar, ziyaretçiler ve trafik analizi tablolarındaki indirme düğmesi seçili site/tarih aralığı için sunucu tarafında Excel uyumlu UTF-8 CSV dosyası oluşturur.
+
+### Uygulama güvenlik/günlük işleri migration'ı
+
+Mevcut veritabanına `migrations/2026-11-08-high-priority-fixes.sql` dosyasını **bir kez** uygulayın. Migration, pageview/session alanları ve indeksleri, login deneme sayacı, Geo-IP cache/kuyruğu tablolarını oluşturur ve mevcut pageview kayıtlarından günlük istatistikleri doldurur. Migration öncesi yedek alın; `sessions` tablosunda aynı website/session anahtarına ait mükerrer satır varsa unique indeks eklenmeden önce bunları elle uzlaştırın. Yeni kurulumlarda aynı şema `db.sql` içindedir.
+
+Çok kiracılı site sahipliği için `migrations/2026-11-08-multi-tenant-websites.sql` dosyasını ayrıca **bir kez** uygulayın. Migration `websites.user_id` alanını ekler ve kullanıcı-sahiplik ilişkisini kurar. Veritabanında yalnızca bir kullanıcı varsa eski siteler güvenle ona atanır. Birden fazla kullanıcı varsa sahipliği bilinmeyen eski siteler `user_id = NULL` kalır ve panelde hiçbir kullanıcıya gösterilmez; veriyi görmeden tahminle atama yapılmaz. Yedek aldıktan sonra eski siteleri gerçek sahiplerine atayın; örnek:
+
+```sql
+UPDATE websites SET user_id = 2 WHERE id IN (10, 11);
+UPDATE websites SET user_id = 3 WHERE id IN (12);
+```
+
+Site listesi, panel seçicisi, analiz, düzenleme ve silme işlemleri oturum açmış kullanıcının `user_id` değeriyle sınırlandırılır. Yeni eklenen siteler otomatik olarak oturum sahibine bağlanır.
+
+Site saat dilimi ve ekip erişimi için önce yukarıdaki çok kiracılı sahiplik migration'ını, ardından `migrations/2026-11-08-site-timezones-and-team-access.sql` dosyasını **bir kez** uygulayın. Site sahibi, mevcut kullanıcıları salt okunur veya düzenleme yetkisiyle davet edebilir. Davet bağlantısı 7 gün geçerlidir ve sadece davet edilen e-posta adresiyle giriş yapılmış hesap tarafından kabul edilir. Ekipteki düzenleme yetkisi site bilgilerini güncelleyebilir; API anahtarı yenileme, site silme ve ekip yönetimi yalnızca sahibindedir. API anahtarı yenilendiğinde eski takip kodu hemen geçersiz olacağından sitelerdeki snippet'leri de güncelleyin. Uygulama canonical adresi proxy veya ters proxy arkasında doğru algılanmıyorsa davet URL'leri için `APP_URL` ortam değişkenini (örn. `https://analytics.example.com`) tanımlayın.
+
+Geo-IP lookup artık pageview isteğinde üçüncü taraf servisi beklemez. Worker hem bekleyen kuyruk işlerini işler hem de ülke bilgisi eksik geçmiş pageview IP'lerini bulup kuyruğa ekler. Her 5 dakikada bir çalıştırın:
+
+```text
+php /path/to/web-analytics/bin/process-geo-lookups.php 50
+php /path/to/web-analytics/bin/process-notifications.php 50
+```
+
+Linux cron için iki satır ekleyebilirsiniz:
+
+```cron
+*/5 * * * * /usr/bin/php /path/to/web-analytics/bin/process-geo-lookups.php 50
+*/5 * * * * /usr/bin/php /path/to/web-analytics/bin/process-notifications.php 50
+```
+
+Windows'ta PowerShell'i açıp görevleri geçerli kullanıcı için kurun:
+
+```powershell
+.\bin\install-windows-scheduled-tasks.ps1
+```
+
+Taşınabilir PHP otomatik bulunamazsa `-PhpPath "D:\path\to\php.exe"` verin. Kurulum, oturum açıkken her 5 dakikada çalışan Geo-IP ve bildirim görevlerini oluşturur; kaldırmak için `.\bin\install-windows-scheduled-tasks.ps1 -Uninstall` çalıştırın. Linux cron için yukarıdaki iki satırı kullanın. SMTP bildirimleri `notification_deliveries` tablosunda kuyruğa alınır; gönderim hataları beş denemeye kadar gecikmeli yeniden denenir. Eski kayıtların Geo-IP sorguları mevcut pageview IP adreslerini Geo-IP servislerine gönderir.
+
+Yeni kurulumlarda bildirim kuyruğu `db.sql` içindedir. Var olan kurulumlarda `migrations/2026-11-08-notification-deliveries.sql` dosyasını bir kez uygulayın.
+
+Veritabanı bakım ekranı, günlük saklama sayıları, tablo boyutları ve sorgular için gereken indeksleri gösterir. Mevcut veritabanına `migrations/2026-11-08-system-maintenance.sql` dosyasını uygulayın; bu migration `users.is_admin`, `system_logs` ve eksik sorgu indekslerini idempotent biçimde ekler. Yönetici yetkisi varsayılan olarak kapalıdır; yedek aldıktan sonra güvendiğiniz kullanıcıyı açıkça etkinleştirin:
+
+```sql
+UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com';
+```
+
+12 aydan eski pageview, event, session, günlük özet ve API kayıtları; 30 günden eski sistem logları ve `APP_LOG_DIRECTORY` içindeki `app-YYYY-MM-DD.log` dosyaları bakım worker'ı ile temizlenir. Önce güvenli önizleme alın; worker varsayılan olarak yalnızca dry-run yapar:
+
+```text
+php bin/run-maintenance.php
+php bin/run-maintenance.php --execute --batch-size=500
+```
+
+Windows görev kurulum betiği temizliği her gün 03:15'te zamanlar. Linux cron için `15 3 * * * /usr/bin/php /path/to/web-analytics/bin/run-maintenance.php --execute --batch-size=500` satırını ekleyin. Her tabloda tek çalıştırmada en fazla belirtilen batch silinir; worker tekrarlandıkça temizleme sürer. Uygulama günlükleri varsayılan olarak web kök dizininin yanındaki `<proje-dizini-adı>-logs` klasörüne yazılır; gerekirse `APP_LOG_DIRECTORY` ile yalnızca bu uygulamaya ayrılmış bir klasör belirtin. PHP, web sunucusu ve MySQL'in kendi logları sunucu/işletim sistemi log rotasyonuyla ayrıca yönetilmelidir.
+
+Sistem ekranındaki "Optimize et" işlemi yalnızca izin verilen MyISAM analitik tablolarında `OPTIMIZE TABLE` çalıştırır. MyISAM tablo işlem sırasında kilitlenebileceğinden düşük trafikte ve tablo başına ayrı çalıştırın.
+
+`tracker.js`, ilk yüklemenin yanı sıra `history.pushState`, `history.replaceState`, `popstate` ve `hashchange` ile gerçekleşen SPA sayfa geçişlerini de kaydeder. Aynı URL'ye yapılan geçişler tekrar görüntüleme olarak sayılmaz.
+
+Tracker, User-Agent içinde yaygın bot/crawler ve headless tarayıcı imzaları bulunan istekleri kaydetmez. Bu sezgisel filtre tüm otomasyonları tanımayı garanti etmez ve User-Agent değerinin değiştirilebileceği dikkate alınmalıdır.
+
+Proxy arkasında çalışıyorsanız `TRUSTED_PROXIES` ortam değişkenine yalnızca güvendiğiniz proxy IP adreslerini virgülle ayırarak tanımlayın. Login denemeleri IP başına 15 dakikada 20, IP/e-posta çifti başına 5 denemeyle sınırlıdır. Hata ayrıntıları için `APP_ENV=development` ayarlanmadıkça tarayıcıya gösterilmez.
+
+### 🔐 İki Faktörlü Doğrulama
+
+Mevcut veritabanlarında `migrations/2026-11-08-user-two-factor-auth.sql` migration dosyasını uygulamadan önce veritabanınızı yedekleyin ve SQL dosyasını uygulama veritabanında çalıştırın. Yeni kurulumlarda aynı kolonlar `db.sql` içinde tanımlıdır. Migration tekrar çalıştırılabilir; var olan kullanıcıların 2FA'sı varsayılan olarak kapalı kalır.
+
+Hesap Ayarları > Güvenlik bölümünden kurulumu başlatın ve authenticator uygulamanızla ekranda gösterilen QR kodunu tarayın. QR kodu taranamıyorsa kurulum anahtarını elle girebilirsiniz. Ardından doğrulama kodunu girip kurulumu tamamlayın. QR kodu yerel JavaScript ile üretilir; TOTP anahtarı harici bir servise gönderilmez. Etkinleştirme sonrasında gösterilen kurtarma kodlarını güvenli bir yerde saklayın; her kod yalnızca bir kez kullanılabilir ve sonradan tekrar gösterilmez.
+
+İlk kurulumda `.web-analytics-2fa.key` anahtarı PHP tarafından uygulamanın web kökü dışındaki üst dizininde oluşturulur. Bu dosyayı web üzerinden erişilemeyen, yalnızca uygulamanın okuyabildiği izinlerle saklayın ve şifreli veritabanı yedekleriyle birlikte güvenli olarak yedekleyin. Anahtar kaybolursa mevcut kayıtlı TOTP sırları çözülemez; anahtarı değiştirmek mevcut 2FA kurulumlarını kullanılamaz hale getirir.
 
 ### 🔒 Güvenlik
 
 - Tüm takip istekleri için API anahtarı doğrulaması
 - Kötüye kullanımı önlemek için rate limiting
-- Cross-origin istekleri için CORS başlıkları
+- Tracking API için kayıtlı site domainiyle eşleşen Origin kontrolü ve kısıtlı CORS yanıtı
 - Prepared statements ile SQL injection koruması
 
 ### 📄 Lisans

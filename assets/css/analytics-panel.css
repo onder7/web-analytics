@@ -1,0 +1,94 @@
+.analytics-panel-body {
+    margin: 0;
+    background: #f8fafc;
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.analytics-panel-body * {
+    box-sizing: border-box;
+}
+
+.analytics-panel-body .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.analytics-panel-body .scrollbar-thin::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgba(148, 163, 184, .35);
+}
+
+.analytics-panel-body .animate-slide-up {
+    animation: analytics-slide-up .45s ease-out both;
+}
+
+.analytics-panel-body .animate-fade-in {
+    animation: analytics-fade-in .25s ease-out both;
+}
+
+#analytics-sidebar {
+    background: linear-gradient(180deg, #111c31 0%, #080e1a 100%);
+    border-right: 1px solid #25334b;
+}
+
+#analytics-sidebar a,
+#analytics-sidebar button {
+    outline-offset: 2px;
+}
+
+#analytics-sidebar nav a:not(.bg-gradient-to-r) {
+    color: #cbd5e1;
+}
+
+#analytics-sidebar nav a:not(.bg-gradient-to-r):hover {
+    color: #fff;
+    background-color: #26364f;
+}
+
+#analytics-sidebar nav a.bg-gradient-to-r {
+    color: #fff;
+    background-image: linear-gradient(105deg, #2563eb 0%, #0891b2 100%);
+    box-shadow: 0 8px 18px rgba(8, 47, 73, .35);
+}
+
+.auth-page {
+    background: #f8fafc;
+}
+
+.auth-shell {
+    min-height: 100vh;
+}
+
+.auth-form-card {
+    animation: analytics-slide-up .4s ease-out both;
+}
+
+.auth-form-card input:-webkit-autofill,
+.auth-form-card input:-webkit-autofill:hover,
+.auth-form-card input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #334155;
+    box-shadow: 0 0 0 1000px #f8fafc inset;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+@keyframes analytics-slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes analytics-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (min-width: 1024px) {
+    #analytics-sidebar.is-collapsed {
+        width: 5rem;
+    }
+
+    #analytics-sidebar.is-collapsed .sidebar-label {
+        display: none;
+    }
+}
